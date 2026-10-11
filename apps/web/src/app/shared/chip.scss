@@ -1,0 +1,13 @@
+.chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font: var(--mat-sys-label-medium);
+  white-space: nowrap;
+  color: var(--chip, #5f6368);
+  background: color-mix(in srgb, var(--chip, #5f6368) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chip, #5f6368) 35%, transparent);
+}
+.muted-chip {
+  --chip: #9aa0a6;
+}

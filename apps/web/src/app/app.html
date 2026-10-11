@@ -1,0 +1,25 @@
+@if (auth.user(); as user) {
+  <mat-toolbar class="toolbar">
+    <mat-icon>verified_user</mat-icon>
+    <span class="brand">Claims Review</span>
+    <nav>
+      @if (user.role === 'CLAIMANT') {
+        <a mat-button routerLink="/my-claims" routerLinkActive="active">My claims</a>
+      }
+      @if (user.role === 'REVIEWER' || user.role === 'ADMIN') {
+        <a mat-button routerLink="/queue" routerLinkActive="active">Review queue</a>
+      }
+      @if (user.role === 'APPROVER' || user.role === 'ADMIN') {
+        <a mat-button routerLink="/approvals" routerLinkActive="active">Final approvals</a>
+      }
+    </nav>
+    <span class="spacer"></span>
+    <span class="user">{{ user.name }} · {{ user.role | label }}</span>
+    <button mat-icon-button (click)="auth.logout()" aria-label="Sign out" title="Sign out">
+      <mat-icon>logout</mat-icon>
+    </button>
+  </mat-toolbar>
+}
+<main>
+  <router-outlet />
+</main>

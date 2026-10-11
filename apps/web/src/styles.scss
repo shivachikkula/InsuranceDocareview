@@ -1,0 +1,88 @@
+@use '@angular/material' as mat;
+
+html {
+  color-scheme: light;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$orange-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+}
+
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  font-family: Roboto, 'Helvetica Neue', sans-serif;
+  background: var(--mat-sys-surface-container-low);
+  color: var(--mat-sys-on-surface);
+}
+
+.page {
+  max-width: 1200px;
+  margin: 24px auto;
+  padding: 0 16px;
+}
+.page-wide {
+  margin: 16px;
+}
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.spacer {
+  flex: 1;
+}
+.muted {
+  color: var(--mat-sys-on-surface-variant);
+}
+.full-width {
+  width: 100%;
+}
+h1 {
+  font: var(--mat-sys-headline-small);
+  margin: 0 0 16px;
+}
+h2 {
+  font: var(--mat-sys-title-medium);
+  margin: 16px 0 8px;
+}
+
+/* Severity and status colours shared across screens */
+.sev-HIGH {
+  --chip: #b3261e;
+}
+.sev-MEDIUM {
+  --chip: #b26a00;
+}
+.sev-LOW {
+  --chip: #5f6368;
+}
+.status-APPROVED {
+  --chip: #1e7e34;
+}
+.status-REJECTED {
+  --chip: #b3261e;
+}
+.status-MANUAL_REVIEW,
+.status-PENDING_INFO {
+  --chip: #b26a00;
+}
+.status-READY_FOR_APPROVAL,
+.status-PENDING_FINAL_APPROVAL {
+  --chip: #0b57d0;
+}
+.status-SUBMITTED,
+.status-PROCESSING,
+.status-DRAFT {
+  --chip: #5f6368;
+}

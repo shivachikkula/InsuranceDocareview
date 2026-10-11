@@ -1,0 +1,25 @@
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  gap: 8px;
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+}
+.toolbar a.mat-mdc-button,
+.toolbar button.mat-mdc-icon-button {
+  color: var(--mat-sys-on-primary);
+}
+.brand {
+  font: var(--mat-sys-title-large);
+  margin-right: 16px;
+}
+nav a.active {
+  background: color-mix(in srgb, var(--mat-sys-on-primary) 15%, transparent);
+}
+.spacer {
+  flex: 1;
+}
+.user {
+  font: var(--mat-sys-body-medium);
+}

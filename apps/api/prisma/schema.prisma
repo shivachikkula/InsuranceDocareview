@@ -1,0 +1,205 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CLAIMANT
+  REVIEWER
+  APPROVER
+  ADMIN
+}
+
+enum LineOfBusiness {
+  AUTO
+  PROPERTY
+  HEALTH
+}
+
+enum PolicyStatus {
+  ACTIVE
+  LAPSED
+  CANCELLED
+}
+
+enum ClaimStatus {
+  DRAFT
+  SUBMITTED
+  PROCESSING
+  PENDING_INFO
+  MANUAL_REVIEW
+  READY_FOR_APPROVAL
+  PENDING_FINAL_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum DocumentType {
+  CLAIM_FORM
+  INVOICE
+  ESTIMATE
+  POLICE_REPORT
+  MEDICAL_REPORT
+  PHOTO
+  RECEIPT
+  OTHER
+}
+
+enum Recommendation {
+  APPROVE
+  MANUAL_REVIEW
+  REQUEST_INFO
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum FindingSource {
+  RULE
+  AI
+}
+
+enum FindingVerdict {
+  VALID
+  FALSE_POSITIVE
+}
+
+enum ActorType {
+  USER
+  SYSTEM
+  AI
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+
+  policies       Policy[]
+  claims         Claim[]  @relation("ClaimClaimant")
+  reviewedClaims Claim[]  @relation("ClaimReviewer")
+  approvedClaims Claim[]  @relation("ClaimApprover")
+}
+
+model Policy {
+  id             String         @id @default(uuid())
+  policyNumber   String         @unique
+  holderId       String
+  holder         User           @relation(fields: [holderId], references: [id])
+  lineOfBusiness LineOfBusiness
+  status         PolicyStatus   @default(ACTIVE)
+  effectiveDate  DateTime
+  expiryDate     DateTime
+  coverageLimit  Decimal        @db.Decimal(12, 2)
+  deductible     Decimal        @db.Decimal(12, 2)
+  exclusions     String[]
+  terms          String
+  claims         Claim[]
+}
+
+model Claim {
+  id              String          @id @default(uuid())
+  claimNumber     String          @unique
+  policyId        String
+  policy          Policy          @relation(fields: [policyId], references: [id])
+  claimantId      String
+  claimant        User            @relation("ClaimClaimant", fields: [claimantId], references: [id])
+  status          ClaimStatus     @default(DRAFT)
+  incidentDate    DateTime
+  description     String
+  amountClaimed   Decimal         @db.Decimal(12, 2)
+  providerName    String?
+  submittedAt     DateTime?
+  riskScore       Int?
+  recommendation  Recommendation?
+  aiSummary       String?
+  missingDocuments String[]       @default([])
+  reviewedById    String?
+  reviewedBy      User?           @relation("ClaimReviewer", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  approvedById    String?
+  approvedBy      User?           @relation("ClaimApprover", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  decisionComment String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  documents ClaimDocument[]
+  reviews   AiReview[]
+  findings  Finding[]
+  auditLogs AuditLog[]
+
+  @@index([status])
+  @@index([policyId])
+}
+
+model ClaimDocument {
+  id         String       @id @default(uuid())
+  claimId    String
+  claim      Claim        @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  type       DocumentType
+  fileName   String
+  mimeType   String
+  sizeBytes  Int
+  sha256     String
+  storageKey String
+  uploadedAt DateTime     @default(now())
+
+  @@index([sha256])
+}
+
+model AiReview {
+  id               String         @id @default(uuid())
+  claimId          String
+  claim            Claim          @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  model            String
+  recommendation   Recommendation
+  riskScore        Int
+  summary          String
+  extractedFields  Json
+  missingDocuments String[]
+  usage            Json?
+  createdAt        DateTime       @default(now())
+  findings         Finding[]
+}
+
+model Finding {
+  id              String          @id @default(uuid())
+  claimId         String
+  claim           Claim           @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  aiReviewId      String?
+  aiReview        AiReview?       @relation(fields: [aiReviewId], references: [id], onDelete: Cascade)
+  source          FindingSource
+  code            String
+  severity        Severity
+  description     String
+  evidence        Json            @default("[]")
+  verdict         FindingVerdict?
+  createdAt       DateTime        @default(now())
+
+  @@index([claimId])
+}
+
+model AuditLog {
+  id        String    @id @default(uuid())
+  claimId   String?
+  claim     Claim?    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  actorType ActorType
+  actorId   String?
+  action    String
+  details   Json      @default("{}")
+  createdAt DateTime  @default(now())
+
+  @@index([claimId])
+}
