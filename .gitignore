@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.angular/
+*.tsbuildinfo
+.env
+apps/api/storage/
+apps/api/src/generated/
+__pycache__/
+.DS_Store

@@ -1,0 +1,283 @@
+@if (claim(); as c) {
+  <div class="layout">
+    <!-- Left: assessment and decision -->
+    <section class="assessment">
+      <a mat-button [routerLink]="auth.hasRole(['APPROVER']) ? '/approvals' : '/queue'">
+        <mat-icon>arrow_back</mat-icon> Back to queue
+      </a>
+
+      <header class="row">
+        <h1>{{ c.claimNumber }}</h1>
+        <app-status-chip [status]="c.status" />
+        <span class="spacer"></span>
+        <span class="muted">AI risk</span>
+        <app-risk-badge [score]="c.riskScore" />
+      </header>
+
+      @if (inFlight()) {
+        <mat-progress-bar mode="indeterminate" />
+        <p class="muted">Automated review in progress…</p>
+      }
+
+      <div class="facts">
+        <div>
+          <span class="muted">Amount</span><strong>{{ c.amountClaimed | currency }}</strong>
+        </div>
+        <div>
+          <span class="muted">Incident</span
+          ><strong>{{ c.incidentDate | date: 'mediumDate' : 'UTC' }}</strong>
+        </div>
+        <div>
+          <span class="muted">Claimant</span><strong>{{ c.claimant.name }}</strong>
+        </div>
+        <div>
+          <span class="muted">Policy</span>
+          <strong>{{ c.policy.policyNumber }} · {{ c.policy.lineOfBusiness | label }}</strong>
+        </div>
+        <div>
+          <span class="muted">Cover</span>
+          <strong
+            >{{ c.policy.coverageLimit | currency: 'USD' : 'symbol' : '1.0-0' }} limit ·
+            {{ c.policy.deductible | currency: 'USD' : 'symbol' : '1.0-0' }} ded.</strong
+          >
+        </div>
+        <div>
+          <span class="muted">Provider</span><strong>{{ c.providerName || '—' }}</strong>
+        </div>
+      </div>
+
+      @if (c.aiSummary) {
+        <mat-card appearance="outlined" class="summary">
+          <mat-card-content>
+            <div class="row">
+              <mat-icon>smart_toy</mat-icon>
+              <strong>AI assessment</strong>
+              <span class="spacer"></span>
+              <span class="muted">Recommends: {{ c.recommendation | label }}</span>
+            </div>
+            <p>{{ c.aiSummary }}</p>
+            <p class="muted small">
+              Model {{ c.aiModel }}. AI output is advisory; you make the decision.
+            </p>
+          </mat-card-content>
+        </mat-card>
+      }
+
+      <h2>Findings ({{ c.findings?.length ?? 0 }})</h2>
+      @for (f of c.findings; track f.id) {
+        <mat-card appearance="outlined" class="finding sev-border-{{ f.severity }}">
+          <mat-card-content>
+            <div class="row">
+              <app-severity-chip [severity]="f.severity" />
+              <strong>{{ f.code | label }}</strong>
+              <span class="muted small">{{ f.source === 'AI' ? 'AI' : 'Rule' }}</span>
+              <span class="spacer"></span>
+              @if (canReview()) {
+                <mat-button-toggle-group
+                  [value]="verdicts()[f.id]"
+                  (change)="setVerdict(f.id, $event.value)"
+                  hideSingleSelectionIndicator
+                  aria-label="Is this finding valid?"
+                >
+                  <mat-button-toggle value="VALID" matTooltip="Finding is correct"
+                    >Valid</mat-button-toggle
+                  >
+                  <mat-button-toggle value="FALSE_POSITIVE" matTooltip="Finding is wrong"
+                    >False positive</mat-button-toggle
+                  >
+                </mat-button-toggle-group>
+              } @else if (f.verdict) {
+                <span class="muted small">Reviewer: {{ f.verdict | label }}</span>
+              }
+            </div>
+            <p>{{ f.description }}</p>
+            @for (e of f.evidence; track $index) {
+              <button class="evidence" (click)="openEvidence(e)" [disabled]="!e.documentId">
+                <mat-icon inline>description</mat-icon>
+                <span class="quote">“{{ e.quote }}”</span>
+                <span class="muted">{{ evidenceLabel(e) }}</span>
+              </button>
+            }
+          </mat-card-content>
+        </mat-card>
+      } @empty {
+        <p class="muted">No discrepancies found.</p>
+      }
+
+      @if (c.extractedFields?.length) {
+        <h2>Extracted fields</h2>
+        <table class="fields">
+          @for (field of c.extractedFields; track $index) {
+            <tr (click)="openEvidence(field)" class="clickable">
+              <td class="muted">{{ field.name }}</td>
+              <td>{{ field.value }}</td>
+              <td class="muted small">
+                {{ documentName()(field.documentId) }}
+                @if (field.page) {
+                  , p.{{ field.page }}
+                }
+              </td>
+              <td><app-severity-chip [severity]="field.confidence" /></td>
+            </tr>
+          }
+        </table>
+      }
+
+      <h2>Claimant's description</h2>
+      <p class="pre">{{ c.description }}</p>
+
+      <!-- Decision -->
+      @if (canReview()) {
+        <mat-card appearance="outlined" class="decision">
+          <mat-card-content>
+            <h2>Your decision</h2>
+            @if (c.finalApprovalRequired) {
+              <p class="muted small">
+                <mat-icon inline>group</mat-icon> This amount needs a second approver after you
+                approve.
+              </p>
+            }
+            <mat-form-field class="full-width">
+              <mat-label
+                >Comment (required to reject or request info; shown to the claimant)</mat-label
+              >
+              <textarea matInput rows="3" [(ngModel)]="comment"></textarea>
+            </mat-form-field>
+            <mat-form-field class="full-width">
+              <mat-label>Documents to request (comma-separated)</mat-label>
+              <input
+                matInput
+                [(ngModel)]="requestedDocuments"
+                placeholder="e.g. Police report, Itemised invoice"
+              />
+            </mat-form-field>
+            @if (error()) {
+              <p class="error">{{ error() }}</p>
+            }
+            <div class="row">
+              <button mat-flat-button (click)="decide('APPROVE')" [disabled]="busy()">
+                <mat-icon>check</mat-icon> Approve
+              </button>
+              <button mat-stroked-button (click)="decide('REQUEST_INFO')" [disabled]="busy()">
+                <mat-icon>help_outline</mat-icon> Request info
+              </button>
+              <button
+                mat-stroked-button
+                class="danger"
+                (click)="decide('REJECT')"
+                [disabled]="busy()"
+              >
+                <mat-icon>close</mat-icon> Reject
+              </button>
+              <span class="spacer"></span>
+              <button
+                mat-button
+                (click)="rerun()"
+                [disabled]="busy()"
+                matTooltip="Run rules and AI review again"
+              >
+                <mat-icon>refresh</mat-icon> Re-run review
+              </button>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      } @else if (canFinalApprove()) {
+        <mat-card appearance="outlined" class="decision">
+          <mat-card-content>
+            <h2>Final approval</h2>
+            <p>
+              Approved by <strong>{{ c.reviewedBy }}</strong> on
+              {{ c.reviewedAt | date: 'medium' }}.
+              @if (c.decisionComment) {
+                <br /><span class="muted">“{{ c.decisionComment }}”</span>
+              }
+            </p>
+            <mat-form-field class="full-width">
+              <mat-label>Comment (required)</mat-label>
+              <textarea matInput rows="3" [(ngModel)]="comment"></textarea>
+            </mat-form-field>
+            @if (error()) {
+              <p class="error">{{ error() }}</p>
+            }
+            <div class="row">
+              <button
+                mat-flat-button
+                (click)="finalDecide('APPROVE')"
+                [disabled]="busy() || !comment.trim()"
+              >
+                <mat-icon>verified</mat-icon> Give final approval
+              </button>
+              <button
+                mat-stroked-button
+                class="danger"
+                (click)="finalDecide('REJECT')"
+                [disabled]="busy() || !comment.trim()"
+              >
+                <mat-icon>close</mat-icon> Reject
+              </button>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      } @else if (c.reviewedBy) {
+        <mat-card appearance="outlined" class="decision">
+          <mat-card-content>
+            <h2>Decision</h2>
+            <p>
+              Reviewed by {{ c.reviewedBy }} on {{ c.reviewedAt | date: 'medium' }}
+              @if (c.approvedBy) {
+                · final decision by {{ c.approvedBy }} on {{ c.approvedAt | date: 'medium' }}
+              }
+            </p>
+            @if (c.decisionComment) {
+              <p class="muted">“{{ c.decisionComment }}”</p>
+            }
+          </mat-card-content>
+        </mat-card>
+      }
+
+      <mat-tab-group class="history" animationDuration="0ms">
+        <mat-tab label="Audit trail">
+          <table class="audit">
+            @for (a of audit(); track a.id) {
+              <tr>
+                <td class="muted small">{{ a.createdAt | date: 'short' }}</td>
+                <td>{{ a.actorType }}</td>
+                <td>{{ a.action | label }}</td>
+                <td class="muted small details">{{ a.details | json }}</td>
+              </tr>
+            }
+          </table>
+        </mat-tab>
+      </mat-tab-group>
+    </section>
+
+    <!-- Right: documents -->
+    <section class="documents">
+      <nav class="doc-tabs">
+        @for (d of c.documents; track d.id) {
+          <button [class.active]="selectedDoc()?.id === d.id" (click)="selectDocument(d)">
+            <mat-icon inline>{{
+              d.mimeType === 'application/pdf' ? 'picture_as_pdf' : 'image'
+            }}</mat-icon>
+            {{ d.type | label }}
+            <span class="muted small">{{ d.fileName }}</span>
+          </button>
+        }
+      </nav>
+      @if (selectedDoc(); as doc) {
+        <app-document-viewer
+          class="viewer"
+          [claimId]="c.id"
+          [document]="doc"
+          [page]="selectedPage()"
+        />
+      } @else {
+        <p class="muted pad">No documents.</p>
+      }
+    </section>
+  </div>
+} @else if (error()) {
+  <p class="error page">{{ error() }}</p>
+} @else {
+  <mat-progress-bar mode="indeterminate" />
+}
